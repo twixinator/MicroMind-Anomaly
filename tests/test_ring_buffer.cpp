@@ -176,3 +176,43 @@ TEST(RingBuffer, SingleElementCapacity) {
     rb.push(static_cast<int16_t>(7));
     EXPECT_EQ(rb[0], static_cast<int16_t>(7));
 }
+
+// ---------------------------------------------------------------------------
+// get() — safe bounds-checked accessor
+// ---------------------------------------------------------------------------
+
+// get() on a valid index returns true and sets the output value.
+TEST(RingBuffer, GetValidIndexReturnsTrue) {
+    micromind::RingBuffer<int16_t, 4> rb;
+    rb.push(static_cast<int16_t>(10));
+    rb.push(static_cast<int16_t>(20));
+    rb.push(static_cast<int16_t>(30));
+
+    int16_t out = 0;
+    EXPECT_TRUE(rb.get(0u, out));
+    EXPECT_EQ(out, static_cast<int16_t>(10));  // oldest
+
+    EXPECT_TRUE(rb.get(2u, out));
+    EXPECT_EQ(out, static_cast<int16_t>(30));  // newest
+}
+
+// get() on an out-of-bounds index returns false and leaves the output unchanged.
+TEST(RingBuffer, GetOutOfBoundsReturnsFalse) {
+    micromind::RingBuffer<int16_t, 4> rb;
+    rb.push(static_cast<int16_t>(42));
+
+    int16_t out = 99;  // sentinel — must not be modified
+    EXPECT_FALSE(rb.get(1u, out));   // only index 0 is valid; size() == 1
+    EXPECT_EQ(out, static_cast<int16_t>(99));  // unchanged
+
+    EXPECT_FALSE(rb.get(4u, out));   // way out of range
+    EXPECT_EQ(out, static_cast<int16_t>(99));  // still unchanged
+}
+
+// get() on an empty buffer always returns false.
+TEST(RingBuffer, GetOnEmptyBufferReturnsFalse) {
+    micromind::RingBuffer<float, 8> rb;
+    float out = -1.0f;
+    EXPECT_FALSE(rb.get(0u, out));
+    EXPECT_FLOAT_EQ(out, -1.0f);  // unchanged
+}

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <array>
+#include <cassert>
 
 namespace micromind {
 
@@ -40,15 +41,28 @@ public:
         // count_ stays at Capacity.
     }
 
-    // Access element at logical index i, where 0 is the oldest element.
-    // Behaviour is undefined (returns default-constructed T) when i >= size().
+    // Access element at logical index, where 0 is the oldest element.
+    // index must be < size(). In debug builds (NDEBUG not defined) an
+    // assertion fires on out-of-bounds access. In release builds the caller
+    // is responsible for bounds checking — prefer get() for safe access.
     // Complexity: O(1).
     T operator[](uint32_t index) const {
-        // Compute physical index via the general formula.
-        // All operands are uint32_t; adding Capacity before the subtraction
-        // prevents underflow for the common case where head_ < count_.
+        assert(index < count_);
         uint32_t physical = (head_ + Capacity - count_ + index) % Capacity;
         return buffer_[physical];
+    }
+
+    // Safe bounds-checked accessor. Sets `out` to the element at logical
+    // index and returns true. Returns false without modifying `out` if
+    // index >= size(). Prefer this over operator[] in production code paths.
+    // Complexity: O(1).
+    bool get(uint32_t index, T& out) const {
+        if (index >= count_) {
+            return false;
+        }
+        uint32_t physical = (head_ + Capacity - count_ + index) % Capacity;
+        out = buffer_[physical];
+        return true;
     }
 
     // Returns the number of valid elements currently stored (0..Capacity).
