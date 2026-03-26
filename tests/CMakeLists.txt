@@ -3,6 +3,7 @@ enable_testing()
 add_executable(micromind_tests
     test_ring_buffer.cpp
     test_inference.cpp
+    test_detector.cpp
 )
 
 # Apply warning flags to test sources (but NOT -fno-exceptions — GoogleTest needs exceptions).
