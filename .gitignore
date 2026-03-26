@@ -1,3 +1,7 @@
+# Markdown docs (plans, specs, review reports — kept local only)
+*.md
+docs/
+
 build/
 *.exe
 *.o
