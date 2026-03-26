@@ -1,5 +1,6 @@
 # Markdown docs (plans, specs, review reports — kept local only)
 *.md
+!README.md
 docs/
 
 build/
