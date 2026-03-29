@@ -36,6 +36,10 @@ docs/                  # Design specs (gitignored)
 tools/                 # Scripts and utilities (future)
 ```
 
+## Naming Override
+
+Free functions in the `micromind` namespace use **snake_case** (e.g., `mat_vec_mul`, `relu`, `dense_forward`). This overrides the global PascalCase convention for functions — it matches the existing codebase and is consistent with C++ standard library style, which is more natural for a low-level embedded library.
+
 ## Testing
 
 - Framework: GoogleTest 1.14.0 (fetched via CMake FetchContent)

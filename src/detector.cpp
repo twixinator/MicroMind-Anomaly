@@ -60,13 +60,16 @@ void Detector::push_sensor_value(float value) {
         {0.25f, 0.25f, 0.25f, 0.25f},
         {0.25f, 0.25f, 0.25f, 0.25f}
     };
-    static const std::array<float, HIDDEN_UNITS> bias_l1 = {};
+    static const std::array<float, HIDDEN_UNITS> bias_l1 = {
+        LAYER1_BIAS_INIT, LAYER1_BIAS_INIT, LAYER1_BIAS_INIT, LAYER1_BIAS_INIT,
+        LAYER1_BIAS_INIT, LAYER1_BIAS_INIT, LAYER1_BIAS_INIT, LAYER1_BIAS_INIT
+    };
 
     static const float weights_l2[OUTPUT_FEATURES][HIDDEN_UNITS] = {
         {0.125f, 0.125f, 0.125f, 0.125f,
          0.125f, 0.125f, 0.125f, 0.125f}
     };
-    static const std::array<float, OUTPUT_FEATURES> bias_l2 = {};
+    static const std::array<float, OUTPUT_FEATURES> bias_l2 = {LAYER2_BIAS_INIT};
 
     std::array<float, HIDDEN_UNITS> hidden{};
     std::array<float, OUTPUT_FEATURES> output{};
