@@ -1,3 +1,6 @@
+#include <cmath>
+#include <cstddef>
+#include <limits>
 #include <gtest/gtest.h>
 #include "micromind/detector.h"
 
@@ -31,8 +34,9 @@ TEST(Detector, CallbackFiresAboveThreshold) {
     det.register_callback(recording_callback);
 
     // Push INPUT_FEATURES (4) samples large enough to exceed threshold.
-    // output = 0.25 * (1+1+1+1) = 1.0f > 0.5f
-    for (uint32_t i = 0; i < micromind::INPUT_FEATURES; ++i) {
+    // Two-layer pass: L1 each unit = 0.25*(1+1+1+1) = 1.0 -> ReLU -> 1.0
+    //                 L2 output    = 0.125*1.0*8     = 1.0 > 0.5
+    for (std::size_t i = 0; i < micromind::INPUT_FEATURES; ++i) {
         det.push_sensor_value(1.0f);
     }
 
@@ -46,8 +50,9 @@ TEST(Detector, CallbackDoesNotFireBelowThreshold) {
     micromind::Detector det;
     det.register_callback(recording_callback);
 
-    // output = 0.25 * (0+0+0+0) = 0.0f < 0.5f
-    for (uint32_t i = 0; i < micromind::INPUT_FEATURES; ++i) {
+    // Two-layer pass: L1 each unit = 0.25*(0+0+0+0) = 0.0 -> ReLU -> 0.0
+    //                 L2 output    = 0.125*0.0*8     = 0.0 < 0.5
+    for (std::size_t i = 0; i < micromind::INPUT_FEATURES; ++i) {
         det.push_sensor_value(0.0f);
     }
 
@@ -61,7 +66,7 @@ TEST(Detector, NullCallbackIsSafe) {
     det.register_callback(nullptr);
 
     // Would fire if a callback were registered.
-    for (uint32_t i = 0; i < micromind::INPUT_FEATURES; ++i) {
+    for (std::size_t i = 0; i < micromind::INPUT_FEATURES; ++i) {
         det.push_sensor_value(1.0f);
     }
     // Test passes if we reach here without a crash.
@@ -69,16 +74,58 @@ TEST(Detector, NullCallbackIsSafe) {
 }
 
 // On cold start (fewer than INPUT_FEATURES samples pushed), the missing
-// slots are zero-padded. With only one sample at 1.0f the output is
-// 0.25 * 1.0 = 0.25f which is below threshold — no callback.
+// slots are zero-padded. With only one sample at 1.0f the two-layer pass
+// yields L1 = 0.25, L2 = 0.125 * 0.25 * 8 = 0.25f, below threshold.
 TEST(Detector, ZeroPaddingOnColdStart) {
     reset_callback();
     micromind::Detector det;
     det.register_callback(recording_callback);
 
     // Push only one sample — three slots zero-padded.
-    // output = 0.25 * 1.0f = 0.25f < 0.5f
+    // Two-layer pass: L1 each unit = 0.25*1.0 = 0.25 -> ReLU -> 0.25
+    //                 L2 output    = 0.125*0.25*8     = 0.25 < 0.5
     det.push_sensor_value(1.0f);
 
     EXPECT_FALSE(g_callback_fired);
+}
+
+// Output exactly at ANOMALY_THRESHOLD (0.5f) must NOT fire the callback,
+// because the comparison is strict greater-than (>), not greater-or-equal.
+// Input [0.5, 0.5, 0.5, 0.5]:
+//   L1 each unit = 0.25*(0.5+0.5+0.5+0.5) = 0.5 -> ReLU -> 0.5
+//   L2 output    = 0.125*0.5*8             = 0.5 == threshold -> no callback
+TEST(Detector, ExactThresholdDoesNotFire) {
+    reset_callback();
+    micromind::Detector det;
+    det.register_callback(recording_callback);
+
+    for (std::size_t i = 0; i < micromind::INPUT_FEATURES; ++i) {
+        det.push_sensor_value(0.5f);
+    }
+
+    EXPECT_FALSE(g_callback_fired);
+}
+
+// A NaN sensor value must be treated as an immediate anomaly — not silently
+// swallowed. NaN > threshold is always false in IEEE 754, so without the
+// guard the callback would never fire.
+TEST(Detector, NaNInputTreatedAsAnomaly) {
+    reset_callback();
+    micromind::Detector det;
+    det.register_callback(recording_callback);
+
+    det.push_sensor_value(std::numeric_limits<float>::quiet_NaN());
+
+    EXPECT_TRUE(g_callback_fired);
+}
+
+// An Inf sensor value must also be treated as an immediate anomaly.
+TEST(Detector, InfInputTreatedAsAnomaly) {
+    reset_callback();
+    micromind::Detector det;
+    det.register_callback(recording_callback);
+
+    det.push_sensor_value(std::numeric_limits<float>::infinity());
+
+    EXPECT_TRUE(g_callback_fired);
 }

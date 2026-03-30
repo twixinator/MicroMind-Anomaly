@@ -48,4 +48,49 @@ void relu(std::array<float, N>& arr)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Activation
+//
+// Selects the activation function applied after the dense layer.
+// kRelu  — clamp negatives to zero (hidden layers)
+// kNone  — identity / pass-through (output layer)
+// ---------------------------------------------------------------------------
+enum class Activation { kRelu, kNone };
+
+// ---------------------------------------------------------------------------
+// dense_forward
+//
+// Composes a full dense layer pass: matrix-vector multiply, bias addition,
+// and optional activation.
+//
+// Zeroing contract: output is zeroed by mat_vec_mul before accumulation.
+// dense_forward does not zero independently — callers need not initialize
+// the output array before calling.
+//
+// The activation branch is a runtime switch; each template instantiation
+// at a concrete call site allows the compiler to eliminate the dead branch
+// after inlining.
+// ---------------------------------------------------------------------------
+template<std::size_t Rows, std::size_t Cols>
+void dense_forward(const float (&weights)[Rows][Cols],
+                   const std::array<float, Rows>& bias,
+                   const std::array<float, Cols>& input,
+                   std::array<float, Rows>& output,
+                   Activation act)
+{
+    mat_vec_mul(weights, input, output);
+
+    for (std::size_t i = 0; i < Rows; ++i) {
+        output[i] += bias[i];
+    }
+
+    switch (act) {
+        case Activation::kRelu:
+            relu(output);
+            break;
+        case Activation::kNone:
+            break;
+    }
+}
+
 } // namespace micromind

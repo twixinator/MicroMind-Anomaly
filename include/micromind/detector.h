@@ -13,9 +13,12 @@ using StopCallback = void(*)();
 // ---------------------------------------------------------------------------
 // Detector
 //
-// Accumulates sensor values in a fixed-capacity ring buffer and runs a single
-// dense-layer inference pass every time a new sample arrives.  When the
-// activation exceeds ANOMALY_THRESHOLD the registered StopCallback is fired.
+// Accumulates sensor values in a fixed-capacity ring buffer and runs a
+// two-layer dense inference pass every time a new sample arrives:
+//   Layer 1: INPUT_FEATURES -> HIDDEN_UNITS (ReLU)
+//   Layer 2: HIDDEN_UNITS   -> OUTPUT_FEATURES (no activation)
+// When the output exceeds ANOMALY_THRESHOLD the registered StopCallback
+// is fired.
 //
 // Memory model: all storage is static.  No heap, no exceptions.
 // Thread safety: none — single-threaded embedded use only.
@@ -30,17 +33,18 @@ public:
     // INPUT_FEATURES samples (zero-padded if fewer are available).
     // If the output exceeds ANOMALY_THRESHOLD and a callback is registered,
     // the callback is called synchronously before this function returns.
+    // Non-finite inputs (NaN, Inf) are treated as immediate anomalies.
+    // Not reentrant — must not be called from within the StopCallback.
     void push_sensor_value(float value);
 
 private:
     RingBuffer<float, RING_BUFFER_CAPACITY> buffer_;
     StopCallback callback_ = nullptr;
+    bool in_push_ = false;
 
-    // weights_ is intentionally NOT a static class member to avoid the C++14
-    // ODR requirement for an out-of-class definition when the array is
-    // passed by reference to mat_vec_mul.  It is instead a function-local
-    // static const inside push_sensor_value, placed in .rodata at link time.
-    // See detector.cpp for the actual values.
+    // Weights and biases are function-local static const inside
+    // push_sensor_value() to avoid C++14 ODR issues and ensure .rodata
+    // placement. See detector.cpp for placeholder values.
 };
 
 } // namespace micromind
