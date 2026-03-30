@@ -33,15 +33,18 @@ public:
     // INPUT_FEATURES samples (zero-padded if fewer are available).
     // If the output exceeds ANOMALY_THRESHOLD and a callback is registered,
     // the callback is called synchronously before this function returns.
+    // Non-finite inputs (NaN, Inf) are treated as immediate anomalies.
+    // Not reentrant — must not be called from within the StopCallback.
     void push_sensor_value(float value);
 
 private:
     RingBuffer<float, RING_BUFFER_CAPACITY> buffer_;
     StopCallback callback_ = nullptr;
+    bool in_push_ = false;
 
     // Weights and biases are function-local static const inside
     // push_sensor_value() to avoid C++14 ODR issues and ensure .rodata
-    // placement. See detector.cpp for values.
+    // placement. See detector.cpp for placeholder values.
 };
 
 } // namespace micromind

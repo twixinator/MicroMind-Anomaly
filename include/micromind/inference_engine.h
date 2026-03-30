@@ -51,9 +51,9 @@ void relu(std::array<float, N>& arr)
 // ---------------------------------------------------------------------------
 // Activation
 //
-// Tag type selecting the activation function applied after the dense layer.
+// Selects the activation function applied after the dense layer.
 // kRelu  — clamp negatives to zero (hidden layers)
-// kNone  — pass-through (output layer)
+// kNone  — identity / pass-through (output layer)
 // ---------------------------------------------------------------------------
 enum class Activation { kRelu, kNone };
 
@@ -64,10 +64,12 @@ enum class Activation { kRelu, kNone };
 // and optional activation.
 //
 // Zeroing contract: output is zeroed by mat_vec_mul before accumulation.
-// dense_forward does not zero independently.
+// dense_forward does not zero independently — callers need not initialize
+// the output array before calling.
 //
-// The activation branch is a runtime 'if' in C++14. At -O2 the compiler
-// optimises for the two known call sites.
+// The activation branch is a runtime switch; each template instantiation
+// at a concrete call site allows the compiler to eliminate the dead branch
+// after inlining.
 // ---------------------------------------------------------------------------
 template<std::size_t Rows, std::size_t Cols>
 void dense_forward(const float (&weights)[Rows][Cols],
@@ -82,8 +84,12 @@ void dense_forward(const float (&weights)[Rows][Cols],
         output[i] += bias[i];
     }
 
-    if (act == Activation::kRelu) {
-        relu(output);
+    switch (act) {
+        case Activation::kRelu:
+            relu(output);
+            break;
+        case Activation::kNone:
+            break;
     }
 }
 

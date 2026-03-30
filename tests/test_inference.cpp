@@ -149,13 +149,13 @@ TEST(DenseForward, NoActivation_PassesThrough)
 
 // Non-zero bias shifts the output by the bias value.
 // weights = [[1, 1]], bias = [0.5], input = [2, 3]
-// pre-activation = 2+3+0.5 = 5.5 -> kNone -> 5.5
+// mat_mul = 1*2 + 1*3 = 5.0, bias = 0.5, output = 5.0 + 0.5 = 5.5
 TEST(DenseForward, BiasCorrectness_ShiftsOutput)
 {
     const float weights[1][2] = { {1.0f, 1.0f} };
     const std::array<float, 1> bias = {0.5f};
     const std::array<float, 2> input = {2.0f, 3.0f};
-    std::array<float, 1> output = {};
+    std::array<float, 1> output = {99.0f};
 
     micromind::dense_forward(weights, bias, input, output,
                              micromind::Activation::kNone);
@@ -196,7 +196,7 @@ TEST(DenseForward, KnownTwoLayerPass_MatchesHandCalc)
     micromind::dense_forward(w2, b2, hidden, output,
                              micromind::Activation::kNone);
 
-    for (std::size_t i = 0; i < 8; ++i) {
+    for (std::size_t i = 0; i < hidden.size(); ++i) {
         EXPECT_FLOAT_EQ(hidden[i], 1.0f);
     }
     EXPECT_FLOAT_EQ(output[0], 1.0f);

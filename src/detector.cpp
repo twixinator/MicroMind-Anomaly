@@ -1,5 +1,6 @@
 #include "micromind/detector.h"
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 namespace micromind {
@@ -9,6 +10,22 @@ void Detector::register_callback(StopCallback cb) {
 }
 
 void Detector::push_sensor_value(float value) {
+    // Reentrance guard: calling push_sensor_value from within the
+    // StopCallback would cause unbounded recursion on a small stack.
+    if (in_push_) { return; }
+    in_push_ = true;
+
+    // Reject non-finite sensor values at the boundary. A NaN or Inf
+    // from a malfunctioning ADC would silently disable detection
+    // (NaN > threshold is always false). Treat as immediate anomaly.
+    if (!std::isfinite(value)) {
+        if (callback_ != nullptr) {
+            callback_();
+        }
+        in_push_ = false;
+        return;
+    }
+
     buffer_.push(value);
 
     // ---------------------------------------------------------------------------
@@ -17,8 +34,9 @@ void Detector::push_sensor_value(float value) {
     // We always want the most recent INPUT_FEATURES samples in chronological
     // order (oldest first), which is what the inference engine expects.
     //
-    // When the buffer holds fewer than INPUT_FEATURES samples, the leading
+    // When the buffer holds fewer than INPUT_FEATURES samples, the trailing
     // slots are zero-padded so the network sees a consistent input shape.
+    // Samples are left-aligned: [v, 0, 0, 0] for a single-sample cold start.
     // ---------------------------------------------------------------------------
     std::array<float, INPUT_FEATURES> input{};
 
@@ -77,11 +95,24 @@ void Detector::push_sensor_value(float value) {
     dense_forward(weights_l1, bias_l1, input, hidden, Activation::kRelu);
     dense_forward(weights_l2, bias_l2, hidden, output, Activation::kNone);
 
+    // Numeric fault check: if inference produced NaN or Inf (e.g., from
+    // overflow with trained weights), treat as anomaly rather than silently
+    // missing the detection.
+    if (!std::isfinite(output[0])) {
+        if (callback_ != nullptr) {
+            callback_();
+        }
+        in_push_ = false;
+        return;
+    }
+
     // Fire the callback synchronously if an anomaly is detected.
     // The null-check avoids a branch-to-null fault on targets with no MMU.
     if (callback_ != nullptr && output[0] > ANOMALY_THRESHOLD) {
         callback_();
     }
+
+    in_push_ = false;
 }
 
 } // namespace micromind
